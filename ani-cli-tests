@@ -9,7 +9,7 @@ if [ -f "/usr/local/bin/ani-cli-testing-version" ]; then
 fi
 
 cleanup() {
-    if [ ! "$keep_testing_version" = 1 ]; then
+    if [ "$keep_testing_version" != 1 ]; then
         rm "$PWD/ani-cli-testing-version" 2>/dev/null
     fi
 }
