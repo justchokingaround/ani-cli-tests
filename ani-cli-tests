@@ -1,0 +1,310 @@
+#!/bin/sh
+set -e
+
+test_log_file="./test_log.txt"
+[ -f "$test_log_file" ] && rm "$test_log_file"
+if [ -f "/usr/local/bin/ani-cli-testing-version" ]; then
+    echo "Please enter your password to remove the testing version of ani-cli currently installed..."
+    sudo rm "/usr/local/bin/ani-cli-testing-version"
+fi
+
+cleanup() {
+    if [ ! "$keep_testing_version" = 1 ]; then
+        rm "$PWD/ani-cli-testing-version" 2>/dev/null
+    fi
+}
+trap cleanup EXIT INT TERM
+
+usage() {
+    printf "
+  Usage: %s [options] [arguments]
+
+  Options:
+    -h, --help
+      Show this help message and exit
+
+    -t, --test
+      Specifies the number of the test to run (1-8)
+      When using this option, the script will exit after the test is completed
+
+    -k, --keep, --keep-testing-version
+      Specifies that the testing version of ani-cli should not be removed after the test is completed, therefore allowing you to use the script normally by running ani-cli-testing-version
+
+    -r, --raw, --raw-link, --url
+        Use this option to pass the raw link of the ani-cli script you'd like to test
+
+    -u, -U, --update
+      Update the script
+
+  Some example usages:
+    ${0##*/} -t 3
+    ${0##*/} -t 5 -k
+    ${0##*/} -r https://raw.githubusercontent.com/pystardust/ani-cli/dev/ani-cli
+
+" "${0##*/}"
+}
+
+confirm() {
+    while true; do
+        printf "%s [Y/n]: " "$1"
+        read -r choice
+        case $choice in
+            [Yy]* | "") return 0 ;;
+            [Nn]*) return 1 ;;
+            *) echo "Please answer yes or no." ;;
+        esac
+    done
+}
+
+ask_for_upload() {
+    if confirm "Would you like to upload this file to oshi.at for easily sharing it?"; then
+        curl -s "https://oshi.at" -F f=@$test_log_file -F shorturl=1 | sed -nE "s@DL: (.*)@\1@p"
+    fi
+}
+
+press_enter_to_continue() {
+    printf "Press enter to continue...\n"
+    read -r _useless
+}
+
+get_test_results() {
+    if confirm "$1"; then
+        echo "This test passed ✅"
+        echo "$1 => passed ✅" >>"$test_log_file"
+    else
+        echo "This test failed ❌"
+        echo "$1 => failed ❌" >>"$test_log_file"
+    fi
+}
+
+checklist_completed() {
+    if confirm "$1"; then
+        printf "Add any comments you have about this test (leave blank otherwise): "
+        read -r comments
+        printf "\nComments: %s\n\n" "$comments" >>"$test_log_file"
+        echo "Checklist for test $2 completed ✅" | tee -a "$test_log_file"
+        echo "---------------------------------" | tee -a "$test_log_file"
+        echo "|||||||||||||||||" | tee -a "$test_log_file"
+        printf "\n" | tee -a "$test_log_file"
+        return 0
+    else
+        return 1
+    fi
+}
+
+checklist() {
+    printf "\n\nTest checklist.\n" | tee -a "$test_log_file"
+    echo "----------------------------------" | tee -a "$test_log_file"
+    case "$1" in
+        1)
+            get_test_results "1. Next works"
+            get_test_results "2. Replay works"
+            get_test_results "3. Prev works"
+            ;;
+        2)
+            get_test_results "1. History works (It starts playing episode 2 of the lain anime)"
+            ;;
+        3)
+            get_test_results "1. Downloading works"
+            get_test_results "2. The downloaded file can be played"
+            ;;
+        4)
+            get_test_results "1. Quality works"
+            ;;
+        5)
+            get_test_results "1. The right episode is played"
+            ;;
+        6)
+            get_test_results "1. The right anime is played"
+            ;;
+        7)
+            get_test_results "1. The episode is played in dub"
+            ;;
+        8)
+            get_test_results "1. The debug feature prints out links"
+            get_test_results "2. 1080p, 720p and 480p links are present"
+            get_test_results "3. mp4 links are present"
+            get_test_results "4. hls (ending in .m3u8) links are present"
+            ;;
+    esac
+}
+
+test_template() {
+    echo "|||||||||||||||||" | tee -a "$test_log_file"
+    # TODO: Implement missing tests
+    # -s syncplay
+    # -r range seletion
+    case "$1" in
+        1) echo "This test is designed to test if next, prev and replay work" | tee -a "$test_log_file" ;;
+        2) echo "This test is designed to test if the history (-c) feature works, as well as the -c flag" | tee -a "$test_log_file" ;;
+        3) echo "This test is designed to test if the download (-d) feature works" | tee -a "$test_log_file" ;;
+        4) echo "This test is designed to test if the quality (-q) feature works" | tee -a "$test_log_file" ;;
+        5) echo "This test is designed to test if the episode (-e) feature works" | tee -a "$test_log_file" ;;
+        6) echo "This test is designed to test if the index (-S) feature works" | tee -a "$test_log_file" ;;
+        7) echo "This test is designed to test if the dub (--dub) feature works" | tee -a "$test_log_file" ;;
+        8) echo "This test is designed to test if the debug feature prints out the appropriate video links" | tee -a "$test_log_file" ;;
+    esac
+    echo "Running test $1..." | tee -a "$test_log_file"
+    echo "Running: $2" | tee -a "$test_log_file"
+    case "$1" in
+        1)
+            echo "Please select episode number 2, then select next, then replay and prev, in that order. That way, the history file should set the current episode to 2." | tee -a "$test_log_file"
+            press_enter_to_continue
+            ;;
+        2)
+            echo "If you ran the previous test, you should be done with episode 2 and the history entry should be set to episode 3. If not, please select episode 2 for the lain anime, and then run the test." | tee -a "$test_log_file"
+            press_enter_to_continue
+            ;;
+        3)
+            echo "Please select the 9ruto shippuuden anime for this test, and choose the 1st episode" | tee -a "$test_log_file"
+            press_enter_to_continue
+            ;;
+        4)
+            echo "Select the 1P anime, and choose episode number 1"
+            echo "After the episode starts playing, use the Shift+I keybind in mpv to toggle information, and make sure that it says 854x480 next to Native Resolution:"
+            press_enter_to_continue
+            ;;
+        5)
+            echo "Select the FLCL anime"
+            echo "After the episode starts playing, use the Shift+I keybind in mpv to toggle information, and make sure that it says flcl-episode-3-sub next to Title:"
+            press_enter_to_continue
+            ;;
+        6)
+            echo "After the episode starts playing, use the Shift+I keybind in mpv to toggle information, and make sure that it says tenki-no-ko-episode-1-sub next to Title:"
+            press_enter_to_continue
+            ;;
+        7)
+            echo "Select the Noragami anime, choose episode 1, and make sure that the audio is in english"
+            press_enter_to_continue
+            ;;
+        8)
+            echo "Make sure that 1080p, 720p, 480p, mp4 and hls links are being displayed, in debug mode"
+            press_enter_to_continue
+            ;;
+    esac
+    $2
+    case "$1" in
+        3)
+            echo "If the download feature works, you should see a file named '9ruto-shippuuden-episode-1-sub.mp4' in the current directory" | tee -a "$test_log_file"
+            echo "Now trying to play the downloaded file..." | tee -a "$test_log_file"
+            mpv "9ruto-shippuuden-episode-1-sub.mp4"
+            rm "9ruto-shippuuden-episode-1-sub.mp4"
+            ;;
+    esac
+    checklist "$1"
+}
+
+test_completion() {
+    printf "\n"
+    while :; do
+        if checklist_completed "Are you done with this test's checklist? (Choosing no will let you run this test again)" "$1"; then
+            break
+        else
+            printf "\nTest %s has been reset.\n" "$1" | tee -a "$test_log_file"
+            test_template "$1" "$2"
+        fi
+    done
+}
+
+run_test() {
+    test_template "$1" "$2"
+    test_completion "$1" "$2"
+}
+
+execute_test() {
+    case $1 in
+        1) run_test "1" "ani-cli-testing-version lain" ;;
+        2) run_test "2" "ani-cli-testing-version -c" ;;
+        3) run_test "3" "ani-cli-testing-version -d naruto" ;;
+        4) run_test "4" "ani-cli-testing-version -q 480 one piece" ;;
+        5) run_test "5" "ani-cli-testing-version -e 3 flcl" ;;
+        6) run_test "6" "ani-cli-testing-version weathering -S 2" ;;
+        7) run_test "7" "ani-cli-testing-version noragami --dub" ;;
+        8) run_test "8" "env ANI_CLI_PLAYER=debug ani-cli-testing-version the garden of words" ;;
+    esac
+}
+
+update_script() {
+    which_ani_cli_tests="$(command -v ani-cli-tests)"
+    [ -z "$which_ani_cli_tests" ] && echo "Can't find ani-cli-tests in PATH"
+    [ -z "$which_ani_cli_tests" ] && exit 1
+    update=$(curl -s "https://raw.githubusercontent.com/justchokingaround/ani-cli-tests/main/ani-cli-tests" || exit 1)
+    update="$(printf '%s\n' "$update" | diff -u "$which_ani_cli_tests" -)"
+    if [ -z "$update" ]; then
+        send_notification "Script is up to date :)"
+    else
+        if printf '%s\n' "$update" | patch "$which_ani_cli_tests" -; then
+            send_notification "Script has been updated!"
+        else
+            send_notification "Can't update for some reason!"
+        fi
+    fi
+    exit 0
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --)
+            shift
+            anicli="$*"
+            break
+            ;;
+        -h | --help)
+            usage && exit 0
+            ;;
+        -k | --keep | --keep-testing-version)
+            keep_testing_version=1
+            shift
+            ;;
+        -t | --test)
+            test_number="$2"
+            shift 2
+            ;;
+        -r | --raw | --raw-link | --url)
+            raw_link="$2"
+            shift 2
+            ;;
+        -u | -U | --update)
+            update_script
+            ;;
+        *)
+            anicli="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -n "$anicli" ]; then
+    test -f "$PWD/$anicli" || echo "Can't find ani-cli in $PWD/"
+    echo "Making sure ani-cli is executable..."
+    chmod +x "$anicli"
+    echo "Please enter your password to create a symlink to ani-cli-testing-version in /usr/local/bin/"
+    sudo ln -sf "$PWD/$anicli" "/usr/local/bin/ani-cli-testing-version"
+    echo "Symlink created!"
+else
+    if [ -z "$raw_link" ]; then
+        raw_link="https://raw.githubusercontent.com/pystardust/ani-cli/dev/ani-cli"
+        branch="dev"
+    else
+        branch=$(printf "%s" "$raw_link" | sed -E 's/.*\/(.*)\/.*/\1/')
+    fi
+    echo "Getting ani-cli-testing-version from the $branch branch..."
+    curl -s "$raw_link" >ani-cli-testing-version || exit 1
+    chmod +x ani-cli-testing-version
+    echo "Please enter your password to create a symlink to ani-cli-testing-version in /usr/local/bin/"
+    sudo ln -sf "$PWD/ani-cli-testing-version" "/usr/local/bin/ani-cli-testing-version"
+    echo "Symlink created!"
+fi
+
+echo "DISCLAIMER: If you press enter when prompted for a yes/no answer, the answer will be yes."
+press_enter_to_continue
+if [ -n "$test_number" ]; then
+    execute_test "$test_number"
+    ask_for_upload
+    exit 0
+fi
+
+for i in 1 2 3 4 5 6 7 8; do
+    execute_test "$i"
+done
+ask_for_upload
